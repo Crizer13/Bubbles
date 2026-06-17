@@ -87,7 +87,7 @@ export class PlayerController extends Phaser.Physics.Arcade.Sprite {
       this.applyGravity(dt);
     }
 
-    this.resolveState(input);
+    this.resolveState();
   }
 
   // ── Private: timers ──────────────────────────────────────────────────────
@@ -224,7 +224,7 @@ export class PlayerController extends Phaser.Physics.Arcade.Sprite {
   }
 
   // ── Private: resolve animation state ─────────────────────────────────────
-  private resolveState(_input: PlayerInput): void {
+  private resolveState(): void {
     const body = this.body as Phaser.Physics.Arcade.Body;
 
     if (this.dashTimer > 0) {
@@ -240,6 +240,9 @@ export class PlayerController extends Phaser.Physics.Arcade.Sprite {
 
   // ── Helpers ──────────────────────────────────────────────────────────────
   public isOnFloor(): boolean {
-    return (this.body as Phaser.Physics.Arcade.Body).blocked.down;
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    // Use touching.down which is set by physics collider (more reliable than
+    // blocked.down when using manual gravity)
+    return body.touching.down || body.blocked.down;
   }
 }

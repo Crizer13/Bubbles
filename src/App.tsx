@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPhaserGame } from './game/PhaserGame';
 import MainMenu from './MainMenu';
+import Settings from './Settings';
 
-type Screen = 'menu' | 'game' | 'guide';
+type Screen = 'menu' | 'game' | 'guide' | 'settings';
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('menu');
@@ -20,12 +21,16 @@ export default function App() {
   // Start the game
   const handleStart = useCallback(() => {
     setScreen('game');
-    // Game will be created in the effect below once screen changes and DOM renders
   }, []);
 
   // Show guide
   const handleShowGuide = useCallback(() => {
     setScreen('guide');
+  }, []);
+
+  // Show settings
+  const handleShowSettings = useCallback(() => {
+    setScreen('settings');
   }, []);
 
   // Go back to menu
@@ -34,20 +39,24 @@ export default function App() {
     setScreen('menu');
   }, [destroyGame]);
 
+  // Track if we're currently creating a game to prevent double-creation
+  const creatingGameRef = useRef(false);
+
   // Create/destroy Phaser game when screen changes
   useEffect(() => {
-    if (screen === 'game' && containerRef.current && !gameRef.current) {
-      // Small delay to ensure DOM is ready
-      requestAnimationFrame(() => {
+    if (screen === 'game' && containerRef.current && !gameRef.current && !creatingGameRef.current) {
+      creatingGameRef.current = true;
+      const id = setTimeout(() => {
         if (containerRef.current && !gameRef.current) {
           gameRef.current = createPhaserGame(containerRef.current);
         }
-      });
+        creatingGameRef.current = false;
+      }, 50);
+      return () => {
+        clearTimeout(id);
+        creatingGameRef.current = false;
+      };
     }
-    return () => {
-      // Don't destroy on every re-render; only when leaving game screen
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen]);
 
   // Cleanup on unmount
@@ -63,6 +72,7 @@ export default function App() {
       <MainMenu
         onStart={handleStart}
         onShowGuide={handleShowGuide}
+        onShowSettings={handleShowSettings}
       />
     );
   }
@@ -289,6 +299,11 @@ export default function App() {
         </div>
       </div>
     );
+  }
+
+  // ── Settings Screen ────────────────────────────────────────────────
+  if (screen === 'settings') {
+    return <Settings onBack={handleBackToMenu} />;
   }
 
   return null;

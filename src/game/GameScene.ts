@@ -6,10 +6,12 @@
 import Phaser from 'phaser';
 import { PlayerController, PlayerInput } from './PlayerController';
 import { buildLevel, LevelData } from './LevelBuilder';
+import { createSoundGenerator, GameSounds } from './SoundGenerator';
 
 export class GameScene extends Phaser.Scene {
   private player!: PlayerController;
   private level!: LevelData;
+  private sounds!: GameSounds;
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private keyDash!: Phaser.Input.Keyboard.Key;
@@ -18,14 +20,18 @@ export class GameScene extends Phaser.Scene {
   private keyRight!: Phaser.Input.Keyboard.Key;
 
   private inTriggerZone: boolean = false;
+  private levelComplete: boolean = false;
+  private wasAirborne: boolean = true; // Track landing detection
 
   private playerLight!: Phaser.GameObjects.Light;
   private beaconTween!: Phaser.Tweens.Tween;
 
   private stateText!: Phaser.GameObjects.Text;
-  private helpText!: Phaser.GameObjects.Text;
   private triggerText!: Phaser.GameObjects.Text;
   private deathText!: Phaser.GameObjects.Text;
+  private winText!: Phaser.GameObjects.Text;
+
+  private ambientDroneRef: { stop: () => void } | null = null;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -33,6 +39,12 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     this.level = buildLevel(this);
+    this.levelComplete = false;
+
+    // ── Audio — Synthesized sounds (no files needed!) ──────────────────
+    this.sounds = createSoundGenerator();
+    // Start the cavern ambient drone
+    this.ambientDroneRef = this.sounds.ambientDrone();
 
     // ── Background — deep teal cavern ─────────────────────────────────
     this.cameras.main.setBackgroundColor(0x040a0e);
@@ -83,15 +95,13 @@ export class GameScene extends Phaser.Scene {
     );
 
     // ── Music trigger zone ────────────────────────────────────────────
-    const zoneVis = this.add.rectangle(3600, this.level.levelHeight / 2, 800, this.level.levelHeight, 0x44ddff, 0.02);
-    zoneVis.setDepth(-5);
-
     this.physics.add.overlap(
       this.player,
       this.level.musicTriggerZone,
       () => {
         if (!this.inTriggerZone) {
           this.inTriggerZone = true;
+          this.sounds.trigger();
           this.triggerText.setText('✨ THE LIGHT DEEPENS...');
           this.triggerText.setAlpha(1);
           this.tweens.add({
@@ -102,6 +112,15 @@ export class GameScene extends Phaser.Scene {
           });
         }
       },
+      undefined,
+      this,
+    );
+
+    // ── Goal zone — reach to win ──────────────────────────────────────
+    this.physics.add.overlap(
+      this.player,
+      this.level.goalZone,
+      this.onReachGoal,
       undefined,
       this,
     );
@@ -132,7 +151,7 @@ export class GameScene extends Phaser.Scene {
       color: '#6699aa',
     }).setScrollFactor(0).setDepth(100);
 
-    this.helpText = this.add.text(16, 36, '← →/A,D: Move  |  Space/↑: Jump  |  Shift: Dash', {
+    this.add.text(16, 36, '← →/A,D: Move  |  Space/↑: Jump  |  Shift: Dash', {
       fontFamily: 'monospace',
       fontSize: '11px',
       color: '#446677',
@@ -161,9 +180,26 @@ export class GameScene extends Phaser.Scene {
         align: 'center',
       },
     ).setOrigin(0.5).setScrollFactor(0).setDepth(100).setAlpha(0);
+
+    this.winText = this.add.text(
+      Number(this.game.config.width) / 2,
+      Number(this.game.config.height) / 2 - 60,
+      '',
+      {
+        fontFamily: 'monospace',
+        fontSize: '22px',
+        color: '#88ddff',
+        align: 'center',
+      },
+    ).setOrigin(0.5).setScrollFactor(0).setDepth(100).setAlpha(0);
   }
 
   update(time: number, delta: number): void {
+    // If level complete, skip player update but still allow UI
+    if (this.levelComplete) {
+      return;
+    }
+
     const input: PlayerInput = {
       left:        this.cursors.left.isDown  || this.keyLeft.isDown,
       right:       this.cursors.right.isDown || this.keyRight.isDown,
@@ -172,6 +208,23 @@ export class GameScene extends Phaser.Scene {
       jumpHeld:    this.cursors.up.isDown    || this.keyJump.isDown,
       dashPressed: Phaser.Input.Keyboard.JustDown(this.keyDash),
     };
+
+    // Play jump sound on jump press
+    if (input.jumpPressed && this.player.isOnFloor()) {
+      this.sounds.jump();
+    }
+
+    // Play dash sound on dash press
+    if (input.dashPressed) {
+      this.sounds.dash();
+    }
+
+    // Landing detection — play thud when transitioning from airborne to grounded
+    const onFloor = this.player.isOnFloor();
+    if (onFloor && this.wasAirborne) {
+      this.sounds.land();
+    }
+    this.wasAirborne = !onFloor;
 
     this.player.controllerUpdate(time, delta, input);
 
@@ -210,6 +263,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onSpikeHit(): void {
+    if (this.levelComplete) return;
+
+    this.sounds.death();
     this.deathText.setText('💔 THE LIGHT FADES...');
     this.deathText.setAlpha(1);
     this.cameras.main.shake(300, 0.015);
@@ -218,6 +274,39 @@ export class GameScene extends Phaser.Scene {
     this.time.delayedCall(800, () => {
       this.deathText.setAlpha(0);
       this.respawnPlayer();
+    });
+  }
+
+  private onReachGoal(): void {
+    if (this.levelComplete) return;
+
+    this.levelComplete = true;
+
+    // Victory sound!
+    this.sounds.victory();
+
+    // Freeze the player
+    this.player.setVelocity(0, 0);
+    (this.player.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
+
+    // Victory effects
+    this.winText.setText('🌟 THE LIGHT ASCENDS!\nYou reached the exit!');
+    this.winText.setAlpha(1);
+    this.cameras.main.shake(500, 0.01);
+    this.cameras.main.flash(300, 80, 200, 100);
+
+    // Big light pulse
+    this.tweens.add({
+      targets: this.playerLight,
+      intensity: { from: 1.5, to: 4.0 },
+      duration: 600,
+      yoyo: true,
+      ease: 'Sine.easeInOut',
+    });
+
+    // Show restart hint
+    this.time.delayedCall(2500, () => {
+      this.winText.setText('🌟 THE LIGHT ASCENDS!\nYou reached the exit!\n\nPress Menu to restart');
     });
   }
 
@@ -231,5 +320,6 @@ export class GameScene extends Phaser.Scene {
   private respawnPlayer(): void {
     this.player.setPosition(this.level.playerSpawn.x, this.level.playerSpawn.y);
     (this.player.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
+    this.wasAirborne = true; // Reset landing tracker on respawn
   }
 }

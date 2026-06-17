@@ -16,6 +16,8 @@ export interface LevelData {
   levelWidth: number;
   levelHeight: number;
   playerSpawn: { x: number; y: number };
+  /** Zone that the player must reach to complete the level */
+  goalZone: Phaser.GameObjects.Zone;
 }
 
 interface MovingPlatformDef {
@@ -59,7 +61,8 @@ export function buildLevel(scene: Phaser.Scene): LevelData {
 
   // ── Pillar Platforms — mossy stone pillars rising from the abyss ──────
   const defs: [number, number, number, number][] = [
-    // Starting area — safe intro
+    // Starting area — safe intro (spawn platform at x=80, y=840 ensures player lands immediately)
+    [60,  840, 160, 20],
     [120,  860, 200, 20],
     [380,  800, 160, 20],
     [600,  860, 180, 20],
@@ -154,16 +157,26 @@ export function buildLevel(scene: Phaser.Scene): LevelData {
   }
 
   // 2. Platform edge spikes — dangerous tips on certain pillar edges
+  // Fixed positions: spike at x = platformX - spikeWidth (left edge) or platformX + platformW (right edge)
   const edgeSpikePositions: [number, number, number, number][] = [
-    [310,  795, 40, 16],   // Left edge of platform at 380,800
-    [530,  695, 40, 16],   // Right edge at 450,700
-    [1030, 815, 40, 16],   // Right edge at 1050,820
-    [1490, 775, 40, 16],   // Right edge at 1500,780
-    [1890, 715, 40, 16],   // Right edge at 1900,800 (wait, that's left)
-    [2090, 735, 40, 16],   // Right edge at 2100,740
-    [2890, 795, 40, 16],   // Right edge at 2900,800
-    [3290, 775, 40, 16],   // Right edge at 3300,780
-    [3690, 755, 40, 16],   // Right edge at 3700,760
+    // Left edge of platform at 380,800 (platform starts at x=380, spike sits at x=380-40=340)
+    [340,  795, 40, 16],
+    // Right edge at 450,650 (vertical moving plat) - spike at x=450+100=550
+    [550,  695, 40, 16],
+    // Right edge at 1050,820 - spike at x=1050+180=1230
+    [1230, 815, 40, 16],
+    // Right edge at 1500,780 - spike at x=1500+160=1660
+    [1660, 775, 40, 16],
+    // Left edge at 1900,800 - spike at x=1900-40=1860
+    [1860, 715, 40, 16],
+    // Right edge at 2100,740 - spike at x=2100+160=2260
+    [2260, 735, 40, 16],
+    // Right edge at 2900,800 - spike at x=2900+160=3060
+    [3060, 795, 40, 16],
+    // Right edge at 3300,780 - spike at x=3300+140=3440
+    [3440, 775, 40, 16],
+    // Right edge at 3700,760 - spike at x=3700+120=3820
+    [3820, 755, 40, 16],
   ];
 
   for (const [sx, sy, sw, sh] of edgeSpikePositions) {
@@ -238,6 +251,39 @@ export function buildLevel(scene: Phaser.Scene): LevelData {
   const triggerZone = scene.add.zone(3600, LEVEL_H / 2, 800, LEVEL_H);
   scene.physics.add.existing(triggerZone, true);
 
+  // ── Goal zone — at the right end of the level ──────────────────────────
+  // Player must reach this area to complete the level
+  const goalZone = scene.add.zone(LEVEL_W - 100, LEVEL_H / 2, 200, LEVEL_H);
+  scene.physics.add.existing(goalZone, true);
+
+  // Visual indicator for goal zone
+  const goalMarker = scene.add.rectangle(LEVEL_W - 100, LEVEL_H - 60, 180, 40, 0x88ddff, 0.08);
+  goalMarker.setDepth(1);
+  goalMarker.setPipeline('Light2D');
+  scene.tweens.add({
+    targets: goalMarker,
+    alpha: 0.02,
+    duration: 1500,
+    yoyo: true,
+    repeat: -1,
+    ease: 'Sine.easeInOut',
+  });
+
+  const goalLabel = scene.add.text(LEVEL_W - 100, LEVEL_H - 65, '✦ EXIT ✦', {
+    fontFamily: 'monospace',
+    fontSize: '12px',
+    color: '#88ddff',
+    align: 'center',
+  }).setOrigin(0.5).setDepth(2).setAlpha(0.6);
+  scene.tweens.add({
+    targets: goalLabel,
+    alpha: 0.2,
+    duration: 1500,
+    yoyo: true,
+    repeat: -1,
+    ease: 'Sine.easeInOut',
+  });
+
   return {
     platforms,
     movingPlatforms,
@@ -248,7 +294,8 @@ export function buildLevel(scene: Phaser.Scene): LevelData {
     towerBeacon: towerBeaconLight,
     levelWidth: LEVEL_W,
     levelHeight: LEVEL_H,
-    playerSpawn: { x: 80, y: LEVEL_H - 120 },
+    playerSpawn: { x: 140, y: 830 }, // Spawn directly on the first platform (60,840,160,20)
+    goalZone,
   };
 }
 

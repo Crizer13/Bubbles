@@ -3,9 +3,10 @@ import { useState, useEffect, useRef } from 'react';
 interface MainMenuProps {
   onStart: () => void;
   onShowGuide: () => void;
+  onShowSettings: () => void;
 }
 
-export default function MainMenu({ onStart, onShowGuide }: MainMenuProps) {
+export default function MainMenu({ onStart, onShowGuide, onShowSettings }: MainMenuProps) {
   const [showContent, setShowContent] = useState(false);
   const [hoveredButton, setHoveredButton] = useState<string | null>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -85,6 +86,16 @@ export default function MainMenu({ onStart, onShowGuide }: MainMenuProps) {
             onClick={onShowGuide}
             accent="purple"
           />
+
+          <MenuButton
+            label="🎛  SETTINGS"
+            sublabel="Audio volume controls"
+            isHovered={hoveredButton === 'settings'}
+            onHover={() => setHoveredButton('settings')}
+            onLeave={() => setHoveredButton(null)}
+            onClick={onShowSettings}
+            accent="pink"
+          />
         </div>
 
         {/* Version footer */}
@@ -105,13 +116,15 @@ interface MenuButtonProps {
   onHover: () => void;
   onLeave: () => void;
   onClick: () => void;
-  accent: 'blue' | 'purple';
+  accent: 'blue' | 'purple' | 'pink';
 }
 
 function MenuButton({ label, sublabel, isHovered, onHover, onLeave, onClick, accent }: MenuButtonProps) {
-  const accentColor = accent === 'blue' ? 'rgba(79, 195, 247, ' : 'rgba(179, 136, 255, ';
-  const borderAccent = accent === 'blue' ? 'border-blue-500/30' : 'border-purple-500/30';
-  const textAccent = accent === 'blue' ? 'text-blue-300' : 'text-purple-300';
+  const accentColor = accent === 'blue'
+    ? 'rgba(79, 195, 247, '
+    : accent === 'purple'
+      ? 'rgba(179, 136, 255, '
+      : 'rgba(255, 128, 171, ';
 
   return (
     <button
@@ -128,7 +141,9 @@ function MenuButton({ label, sublabel, isHovered, onHover, onLeave, onClick, acc
         boxShadow: isHovered
           ? `0 0 30px ${accentColor}0.15), 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12)`
           : '0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06)',
-        borderColor: isHovered ? (accent === 'blue' ? 'rgba(79, 195, 247, 0.3)' : 'rgba(179, 136, 255, 0.3)') : 'rgba(255, 255, 255, 0.06)',
+        borderColor: isHovered
+          ? `${accentColor}0.3)`
+          : 'rgba(255, 255, 255, 0.06)',
       }}
     >
       {/* Glossy shine overlay on hover */}
@@ -154,7 +169,7 @@ function MenuButton({ label, sublabel, isHovered, onHover, onLeave, onClick, acc
       {/* Button content */}
       <div className="relative z-10 flex flex-col items-center gap-0.5">
         <span className={`font-display font-bold text-sm tracking-[0.15em] uppercase transition-colors duration-300 ${
-          isHovered ? textAccent : 'text-gray-300'
+          isHovered ? 'text-gray-200' : 'text-gray-300'
         }`}>
           {label}
         </span>
