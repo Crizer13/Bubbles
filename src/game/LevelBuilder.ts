@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import Phaser from 'phaser';
+import { createPlatformLedges, PlatformLedge } from './platforms/PlatformLedge';
 
 export interface LevelData {
   platforms: Phaser.Physics.Arcade.StaticGroup;
@@ -111,9 +112,10 @@ export function buildLevel(scene: Phaser.Scene): LevelData {
     [4300, 300, 100, 14],
   ];
 
-  for (const [x, y, w, h] of defs) {
-    addPlatform(platforms, x, y, w, h, 'platform_tex');
-  }
+  // ── VISIBLE PLATFORM LEDGES ──────────────────────────────────────────
+  // Using PlatformLedge which has an ALWAYS-VISIBLE rim strip that renders
+  // at full brightness through the Light2D darkness system.
+  const platformLedges = createPlatformLedges(scene, platforms, defs);
 
   // ── Moving platforms ───────────────────────────────────────────────────
   const movingPlatformDefs: MovingPlatformDef[] = [
