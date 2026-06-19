@@ -15,6 +15,7 @@ export class GameScene extends Phaser.Scene {
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private keyDash!: Phaser.Input.Keyboard.Key;
+  private keyDashE!: Phaser.Input.Keyboard.Key;
   private keyJump!: Phaser.Input.Keyboard.Key;
   private keyLeft!: Phaser.Input.Keyboard.Key;
   private keyRight!: Phaser.Input.Keyboard.Key;
@@ -127,7 +128,7 @@ export class GameScene extends Phaser.Scene {
 
     // ── Camera — slow, cinematic ──────────────────────────────────────
     const cam = this.cameras.main;
-    cam.setBounds(0, 0, this.level.levelWidth, this.level.levelHeight);
+    cam.setBounds(0, 0, this.level.levelWidth, this.level.levelHeight + 200);
     cam.startFollow(this.player, true, 0.05, 0.05);
     cam.setDeadzone(50, 30);
 
@@ -139,6 +140,7 @@ export class GameScene extends Phaser.Scene {
     if (this.input.keyboard) {
       this.cursors = this.input.keyboard.createCursorKeys();
       this.keyDash  = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+      this.keyDashE = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
       this.keyJump  = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
       this.keyLeft  = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
       this.keyRight = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
@@ -151,7 +153,7 @@ export class GameScene extends Phaser.Scene {
       color: '#6699aa',
     }).setScrollFactor(0).setDepth(100);
 
-    this.add.text(16, 36, '← →/A,D: Move  |  Space/↑: Jump  |  Shift: Dash', {
+    this.add.text(16, 36, '← →/A,D: Move  |  Space/↑: Jump  |  E/Shift: Dash', {
       fontFamily: 'monospace',
       fontSize: '11px',
       color: '#446677',
@@ -206,7 +208,8 @@ export class GameScene extends Phaser.Scene {
       jumpPressed: Phaser.Input.Keyboard.JustDown(this.cursors.up) ||
                    Phaser.Input.Keyboard.JustDown(this.keyJump),
       jumpHeld:    this.cursors.up.isDown    || this.keyJump.isDown,
-      dashPressed: Phaser.Input.Keyboard.JustDown(this.keyDash),
+      dashPressed: Phaser.Input.Keyboard.JustDown(this.keyDash) ||
+                   Phaser.Input.Keyboard.JustDown(this.keyDashE),
     };
 
     // Play jump sound on jump press

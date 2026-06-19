@@ -55,9 +55,9 @@ export const DEFAULT_PLAYER_CONFIG: PlayerConfig = {
     jumpBufferMs: 120,      // Generous buffer
   },
   dash: {
-    speed: 400,             // Gentle dash
-    durationMs: 150,
-    cooldownMs: 900,        // Longer cooldown
-    endVelocityCutFactor: 0.3,
+    speed: 650,             // Fast burst — zoom across gaps
+    durationMs: 250,        // Longer duration for more distance
+    cooldownMs: 600,        // Shorter cooldown so you can use it more
+    endVelocityCutFactor: 0.2, // Less velocity cut = more momentum
   },
 };
