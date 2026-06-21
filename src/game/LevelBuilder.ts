@@ -212,7 +212,7 @@ export function buildLevel(scene: Phaser.Scene): LevelData {
   }
 
   // ── Elevator shaft — vertical walls and decoration ────────────────────
-  buildElevatorShaft(scene, backgroundTiles, LEVEL_W, LEVEL_H);
+  buildElevatorShaft(scene, backgroundTiles, LEVEL_W, LEVEL_H, movingPlatformDefs[4]);
 
   // ── Hazards ────────────────────────────────────────────────────────────
   const spikeHazards = scene.physics.add.staticGroup();
@@ -591,19 +591,21 @@ function buildTower(
   }
 }
 
-// ── Elevator Shaft — vertical pit with walls on the right side ──────────────
+// ── Elevator Shaft — vertical pit with walls + visible elevator car ────────
 function buildElevatorShaft(
   scene: Phaser.Scene,
   tiles: Phaser.GameObjects.GameObject[],
   levelW: number,
   levelH: number,
+  elevatorDef: MovingPlatformDef,
 ): void {
   const shaftX = 4450;
   const shaftW = 140;
   const shaftTop = 822;
   const shaftBottom = 230;
 
-  // Left wall of the shaft (goes from top to bottom)
+  // ── Shaft walls ──────────────────────────────────────────────────────
+  // Left wall
   const leftWall = scene.add.rectangle(shaftX - shaftW / 2 - 6, (shaftTop + shaftBottom) / 2, 12, shaftTop - shaftBottom, PALETTE.stoneBody, 1);
   leftWall.setDepth(-2);
   leftWall.setPipeline('Light2D');
@@ -613,13 +615,21 @@ function buildElevatorShaft(
   rightWall.setDepth(-2);
   rightWall.setPipeline('Light2D');
 
-  // Left wall rim (visible)
+  // Wall rims at entrance
   const leftRim = scene.add.rectangle(shaftX - shaftW / 2 - 6, shaftTop + 1.5, 14, 3, PALETTE.crystalPurple, 0.5);
   leftRim.setDepth(-1.5);
   const rightRim = scene.add.rectangle(shaftX + shaftW / 2 + 6, shaftTop + 1.5, 14, 3, PALETTE.crystalPurple, 0.5);
   rightRim.setDepth(-1.5);
 
-  // Glowing crystals inside the shaft for atmosphere
+  // ── Vertical guide rails (metal strips on the walls) ────────────────
+  for (const side of [-1, 1]) {
+    const railX = shaftX + side * (shaftW / 2 - 15);
+    const rail = scene.add.rectangle(railX, (shaftTop + shaftBottom) / 2, 2, shaftTop - shaftBottom, 0x2a3a4a, 0.3);
+    rail.setDepth(-1.5);
+    tiles.push(rail);
+  }
+
+  // ── Glowing crystals inside the shaft for atmosphere ────────────────
   for (let i = 0; i < 4; i++) {
     const cY = shaftTop - 60 - i * 130;
     const side = i % 2 === 0 ? -1 : 1;
@@ -628,41 +638,124 @@ function buildElevatorShaft(
     crystal.setPipeline('Light2D');
     const glow = scene.add.rectangle(shaftX + side * 40, cY, 18, 18, PALETTE.crystalBlue, 0.06);
     glow.setDepth(4);
-
     scene.tweens.add({
       targets: crystal,
       alpha: { from: 0.8, to: 0.4 },
       scaleY: { from: 1, to: 1.3 },
       duration: Phaser.Math.Between(800, 1200),
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
+      yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
     });
   }
 
-  // Vertical glow line along shaft (cyan beam)
+  // ── Vertical glow beam ──────────────────────────────────────────────
   const glowLine = scene.add.rectangle(shaftX, (shaftTop + shaftBottom) / 2, 2, shaftTop - shaftBottom - 40, PALETTE.crystalBlue, 0.04);
   glowLine.setDepth(-1);
   scene.tweens.add({
     targets: glowLine,
     alpha: { from: 0.04, to: 0.08 },
-    duration: 2000,
-    yoyo: true,
-    repeat: -1,
-    ease: 'Sine.easeInOut',
+    duration: 2000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
   });
 
-  // Elevator label at top
+  // ── Elevator label at top ───────────────────────────────────────────
   const elevLabel = scene.add.text(shaftX, shaftTop - 18, '▼ ELEVATOR ▼', {
     fontFamily: 'monospace', fontSize: '10px', color: '#44ddff', align: 'center',
   }).setOrigin(0.5).setDepth(2).setAlpha(0.6);
   scene.tweens.add({
     targets: elevLabel,
     alpha: { from: 0.6, to: 0.2 },
-    duration: 1000,
+    duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+  });
+
+  // ── VISIBLE ELEVATOR CAR ────────────────────────────────────────────
+  // A dark stone cabin that rides up and down the shaft.
+  const carW = elevatorDef.w + 20;
+  const carH = 40;
+  const carCX = elevatorDef.x + elevatorDef.w / 2;
+  const carCY = elevatorDef.y - carH / 2 + elevatorDef.h; // sits ON TOP of the platform
+
+  // Elevator car body — dark stone box
+  const carBody = scene.add.rectangle(carCX, carCY, carW, carH, 0x14101e, 1);
+  carBody.setDepth(3);
+  carBody.setPipeline('Light2D');
+
+  // Car roof highlight
+  const carRoof = scene.add.rectangle(carCX, carCY - carH / 2 + 1, carW, 2, 0x2a1e3e, 0.5);
+  carRoof.setDepth(3.5);
+
+  // Car bottom rim (where it meets the platform)
+  const carBottomRim = scene.add.rectangle(carCX, carCY + carH / 2 - 1, carW, 2, PALETTE.crystalBlue, 0.4);
+  carBottomRim.setDepth(3.5);
+
+  // ── Moving blue lights on the car ───────────────────────────────────
+  const lightColors = [0x44ddff, 0x66eeff, 0x33ccff];
+  const lightPositions = [
+    { x: carCX - carW / 2 + 12, y: carCY - 6 },
+    { x: carCX, y: carCY - 8 },
+    { x: carCX, y: carCY + 6 },
+    { x: carCX + carW / 2 - 12, y: carCY - 6 },
+  ];
+  const lights: Phaser.GameObjects.Rectangle[] = [];
+  for (const lp of lightPositions) {
+    const color = Phaser.Utils.Array.GetRandom(lightColors);
+    const light = scene.add.rectangle(lp.x, lp.y, 5, 5, color, 0.9);
+    light.setDepth(4);
+    light.setPipeline('Light2D');
+    lights.push(light);
+
+    // Glow around each light
+    const glow = scene.add.rectangle(lp.x, lp.y, 14, 14, color, 0.15);
+    glow.setDepth(3);
+    lights.push(glow);
+
+    // Pulsing tween
+    scene.tweens.add({
+      targets: light,
+      alpha: { from: 0.9, to: 0.3 },
+      scaleX: { from: 1, to: 1.4 },
+      scaleY: { from: 1, to: 1.4 },
+      duration: Phaser.Math.Between(400, 700),
+      yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+    });
+    scene.tweens.add({
+      targets: glow,
+      alpha: { from: 0.15, to: 0.04 },
+      scaleX: { from: 1, to: 1.8 },
+      scaleY: { from: 1, to: 1.8 },
+      duration: Phaser.Math.Between(600, 1000),
+      yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+    });
+  }
+
+  // Additional blue light strip along the top of the car
+  const topStrip = scene.add.rectangle(carCX, carCY - carH / 2 + 3, carW - 20, 3, PALETTE.crystalBlue, 0.6);
+  topStrip.setDepth(4);
+  topStrip.setPipeline('Light2D');
+  scene.tweens.add({
+    targets: topStrip,
+    alpha: { from: 0.6, to: 0.15 },
+    duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+  });
+
+  // Blue light strip along the bottom
+  const bottomStrip = scene.add.rectangle(carCX, carCY + carH / 2 - 2, carW - 20, 2, PALETTE.crystalBlue, 0.5);
+  bottomStrip.setDepth(4);
+  bottomStrip.setPipeline('Light2D');
+  scene.tweens.add({
+    targets: bottomStrip,
+    alpha: { from: 0.5, to: 0.1 },
+    duration: 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+  });
+
+  // ── Tween the entire car assembly with the same elevator timing ──
+  const carParts = [carBody, carRoof, carBottomRim, topStrip, bottomStrip, ...lights];
+  scene.tweens.add({
+    targets: carParts,
+    y: `+=${elevatorDef.moveY}`,
+    duration: elevatorDef.duration,
     yoyo: true,
     repeat: -1,
     ease: 'Sine.easeInOut',
+    delay: elevatorDef.delay,
   });
 }
 
